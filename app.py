@@ -7,6 +7,7 @@ import logging
 import warnings
 import datetime
 from typing import Optional
+from data_engine import run_data_agent
 
 warnings.filterwarnings("ignore")
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
