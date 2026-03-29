@@ -8,6 +8,7 @@ from ai_agent_llm import *
 from opportunaty_radar import *
 from multi_scanner import *
 from portfolio_ana import *
+from portfolio_ana import _build_main_chart, _build_rsi_chart,_build_sector_pie,_build_projection_chart,_build_backtest_chart
 from backtesting import *
 
 warnings.filterwarnings("ignore")
@@ -774,7 +775,5 @@ def main() -> None:
   <span style="margin-left:auto;color:#f5c842;">Alpha Radar v2.0 · ET AI Hackathon 2026</span>
 </div>""", unsafe_allow_html=True)
 
-
-# =============================================================================
 if __name__ == "__main__":
     main()
