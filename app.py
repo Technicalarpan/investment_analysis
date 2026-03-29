@@ -204,7 +204,10 @@ def _render_ai_card(sd: dict) -> None:
 # =============================================================================
 
 def main() -> None:
-
+    if "pipeline_ran" not in st.session_state:
+        st.session_state.pipeline_ran = False
+    if "pipeline_data" not in st.session_state:
+        st.session_state.pipeline_data = {}
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown("""
     <div class="banner">
@@ -291,7 +294,7 @@ def main() -> None:
         </div>""", unsafe_allow_html=True)
 
     # ── Landing page ──────────────────────────────────────────────────────────
-    if not run_btn:
+    if not run_btn and not st.session_state.pipeline_ran:
         st.markdown('<div class="sh">What Alpha Radar Does For You</div>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
         features = [
@@ -331,6 +334,24 @@ def main() -> None:
         return
 
     # ── Run Pipeline ──────────────────────────────────────────────────────────
+    if not run_btn and st.session_state.pipeline_ran:
+        d = st.session_state.pipeline_data
+        df           = d["df"]
+        ta_signals   = d["ta_signals"]
+        meta         = d["meta"]
+        news_signals = d["news_signals"]
+        news_score   = d["news_score"]
+        decision     = d["decision"]
+        signal_data  = d["signal_data"]
+        smart_rec    = d["smart_rec"]
+        ticker       = d["ticker"]
+        period       = d["period"]
+        use_stub     = d["use_stub"]
+        inv_amount   = d.get("inv_amount", 0)
+        num_stocks_inp = d.get("num_stocks_inp", 1)
+        # Jump straight to rendering (skip the pipeline below)
+        # by re-assigning run_btn so the rest of the code flows normally
+        run_btn = True
     progress = st.progress(0)
     status   = st.empty()
 
@@ -370,6 +391,22 @@ def main() -> None:
     time.sleep(0.1)
     progress.empty()
     status.empty()
+    st.session_state.pipeline_ran = True
+    st.session_state.pipeline_data = {
+        "df": df,
+        "ta_signals": ta_signals,
+        "meta": meta,
+        "news_signals": news_signals,
+        "news_score": news_score,
+        "decision": decision,
+        "signal_data": signal_data,
+        "smart_rec": smart_rec,
+        "ticker": ticker,
+        "period": period,
+        "use_stub": use_stub,
+        "inv_amount": inv_amount,
+        "num_stocks_inp": num_stocks_inp,
+    }
 
     # ── Top Metrics ───────────────────────────────────────────────────────────
     def sg(row, col, default=0.0):
