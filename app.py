@@ -10,6 +10,8 @@ from typing import Optional
 from data_engine import *
 from decision_making import *
 from ai_agent_llm import *
+from opportunaty_radar import *
+from multi_scanner import *
 
 warnings.filterwarnings("ignore")
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
