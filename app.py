@@ -9,6 +9,7 @@ import datetime
 from typing import Optional
 from data_engine import *
 from decision_making import *
+from ai_agent_llm import *
 
 warnings.filterwarnings("ignore")
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
