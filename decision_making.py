@@ -105,24 +105,76 @@ def compute_decision(ta_signals: dict, news_score: float = 0.0) -> dict:
         "positive_reasons": positive_reasons,
         "negative_reasons": negative_reasons,
         "blended_score": round(blended, 4),
+        "_volatility":  round(volatility, 4),   # ATR/price ratio for investment sizing
     }
 
-def investment_amount_advisor(investment_amount: float, risk: str) -> dict:
-    if risk == "HIGH":
-        invest_ratio = 0.3
-        strategy = "Invest cautiously due to high risk"
-        advice = "Market is volatile. Invest only a small portion now and wait for confirmation."
-    elif risk == "MEDIUM":
-        invest_ratio = 0.6
-        strategy = "Invest partially due to moderate risk"
-        advice = "Market is moderately bullish. Invest a portion now and the rest gradually."
+def investment_amount_advisor(investment_amount: float, risk: str,
+                               confidence: int = 50,
+                               volatility: float = 0.0,
+                               news_score: float = 0.0) -> dict:
+    """
+    Dynamic Investment Amount Advisor.
+    Invest ratio is driven by THIS stock's own risk, confidence, volatility & news.
+    Does NOT affect BUY/SELL/HOLD decision.
+    """
+    # Step 1: Base ratio from risk label
+    base_ratio = {"HIGH": 0.30, "MEDIUM": 0.60, "LOW": 1.0}.get(risk, 0.60)
+
+    # Step 2: Confidence modifier (confidence 0–95 → modifier 0.7–1.0)
+    conf_modifier = 0.7 + (min(confidence, 95) / 95) * 0.30
+
+    # Step 3: Volatility modifier (ATR/price ratio)
+    # volatility > 3% → very risky, scale down heavily
+    if volatility > 0.04:
+        vol_modifier = 0.60
+    elif volatility > 0.025:
+        vol_modifier = 0.75
+    elif volatility > 0.012:
+        vol_modifier = 0.90
     else:
-        invest_ratio = 1.0
-        strategy = "Safe to invest full amount"
-        advice = "Market conditions are stable. You can invest your full amount."
+        vol_modifier = 1.0
+
+    # Step 4: News modifier
+    # news_score is -1 to +1; negative news reduces invest ratio
+    if news_score < -0.3:
+        news_modifier = 0.70
+    elif news_score < 0:
+        news_modifier = 0.85
+    elif news_score > 0.3:
+        news_modifier = 1.05  # slight boost for strong positive news
+    else:
+        news_modifier = 1.0
+
+    # Final ratio, clamped between 10% and 100%
+    raw_ratio = base_ratio * conf_modifier * vol_modifier * news_modifier
+    invest_ratio = round(max(0.10, min(1.0, raw_ratio)), 2)
 
     recommended = round(investment_amount * invest_ratio, 2)
     hold_back   = round(investment_amount - recommended, 2)
+
+    # Human-readable strategy label
+    if invest_ratio >= 0.85:
+        strategy = "Safe to invest most/full amount"
+    elif invest_ratio >= 0.60:
+        strategy = "Invest a good portion, hold some back"
+    elif invest_ratio >= 0.35:
+        strategy = "Invest cautiously — moderate risk detected"
+    else:
+        strategy = "Invest very little now — high risk detected"
+
+    # Build explanation showing which factors drove the ratio
+    factors = []
+    if vol_modifier < 0.90:
+        factors.append(f"high price volatility (ATR ratio {volatility:.2%})")
+    if conf_modifier < 0.85:
+        factors.append(f"lower signal confidence ({confidence}%)")
+    if news_modifier < 0.90:
+        factors.append("negative news sentiment")
+    if news_modifier > 1.0:
+        factors.append("positive news tailwind")
+
+    factor_str = ", ".join(factors) if factors else "stable signals across all factors"
+    advice = f"Invest {int(invest_ratio*100)}% now based on: {factor_str}."
 
     return {
         "investment_amount":      investment_amount,
@@ -131,8 +183,11 @@ def investment_amount_advisor(investment_amount: float, risk: str) -> dict:
         "invest_ratio":           invest_ratio,
         "investment_strategy":    strategy,
         "investment_advice":      advice,
+        # expose sub-modifiers so UI can show them
+        "conf_modifier":          round(conf_modifier, 2),
+        "vol_modifier":           round(vol_modifier, 2),
+        "news_modifier":          round(news_modifier, 2),
     }
-
 
 def allocation_advisor(amount: float, num_stocks: int, risk: str) -> dict:
     if num_stocks < 1:
@@ -170,10 +225,12 @@ def allocation_advisor(amount: float, num_stocks: int, risk: str) -> dict:
     }
 
 
-def smart_recommendation(decision: dict, investment_amount: float = None, num_stocks: int = None) -> dict:
+def smart_recommendation(decision: dict, investment_amount: float = None,
+                          num_stocks: int = None, news_score: float = 0.0) -> dict:
     risk   = decision.get("risk", "MEDIUM")
     action = decision.get("action", "HOLD")
-
+    confidence = decision.get("confidence", 50)
+    volatility = decision.get("_volatility", 0.0)   # we'll add this below
     result = {
         "action":  action,
         "risk":    risk,
@@ -181,7 +238,12 @@ def smart_recommendation(decision: dict, investment_amount: float = None, num_st
     }
 
     if investment_amount and investment_amount > 0:
-        inv = investment_amount_advisor(investment_amount, risk)
+        inv = investment_amount_advisor(
+            investment_amount, risk,
+            confidence=confidence,
+            volatility=volatility,
+            news_score=news_score,
+        )
         result["investment_advice"] = inv
 
         if num_stocks and num_stocks > 0:

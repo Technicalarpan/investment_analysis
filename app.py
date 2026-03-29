@@ -357,7 +357,7 @@ def main() -> None:
     # Investment Advisor (Features 1 & 2)
     smart_rec = None
     if inv_amount and inv_amount > 0:
-        smart_rec = smart_recommendation(decision, float(inv_amount), int(num_stocks_inp))
+        smart_rec = smart_recommendation(decision, float(inv_amount), int(num_stocks_inp), news_score=news_score)
     progress.progress(70)
     status.markdown('<div style="color:#7a8ba0;font-size:.82rem;">⏳ Running AI agent…</div>', unsafe_allow_html=True)
 
@@ -620,6 +620,20 @@ def main() -> None:
   </div>
   <div style="background:rgba(255,255,255,.06);border-radius:6px;height:8px;margin-bottom:14px;">
     <div style="background:#00e89a;border-radius:6px;height:8px;width:{ratio_pct}%;"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+    <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:8px;text-align:center;">
+      <div style="font-size:.6rem;color:#7a8ba0;">Confidence</div>
+      <div style="font-size:.85rem;font-weight:700;color:#4fa3ff;">{int(inv_advice.get('conf_modifier',1)*100)}%</div>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:8px;text-align:center;">
+      <div style="font-size:.6rem;color:#7a8ba0;">Volatility</div>
+      <div style="font-size:.85rem;font-weight:700;color:#f5c842;">{int(inv_advice.get('vol_modifier',1)*100)}%</div>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:8px;text-align:center;">
+      <div style="font-size:.6rem;color:#7a8ba0;">News</div>
+      <div style="font-size:.85rem;font-weight:700;color:#00e89a;">{int(inv_advice.get('news_modifier',1)*100)}%</div>
+    </div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
     <div style="background:rgba(0,232,154,.08);border:1px solid rgba(0,232,154,.2);border-radius:8px;padding:10px;text-align:center;">
