@@ -13,6 +13,7 @@ from ai_agent_llm import *
 from opportunaty_radar import *
 from multi_scanner import *
 from portfolio_ana import *
+from backtesting import *
 
 warnings.filterwarnings("ignore")
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
