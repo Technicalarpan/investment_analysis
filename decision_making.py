@@ -107,3 +107,107 @@ def compute_decision(ta_signals: dict, news_score: float = 0.0) -> dict:
         "blended_score": round(blended, 4),
     }
 
+def investment_amount_advisor(investment_amount: float, risk: str) -> dict:
+    if risk == "HIGH":
+        invest_ratio = 0.3
+        strategy = "Invest cautiously due to high risk"
+        advice = "Market is volatile. Invest only a small portion now and wait for confirmation."
+    elif risk == "MEDIUM":
+        invest_ratio = 0.6
+        strategy = "Invest partially due to moderate risk"
+        advice = "Market is moderately bullish. Invest a portion now and the rest gradually."
+    else:
+        invest_ratio = 1.0
+        strategy = "Safe to invest full amount"
+        advice = "Market conditions are stable. You can invest your full amount."
+
+    recommended = round(investment_amount * invest_ratio, 2)
+    hold_back   = round(investment_amount - recommended, 2)
+
+    return {
+        "investment_amount":      investment_amount,
+        "recommended_investment": recommended,
+        "hold_back_amount":       hold_back,
+        "invest_ratio":           invest_ratio,
+        "investment_strategy":    strategy,
+        "investment_advice":      advice,
+    }
+
+
+def allocation_advisor(amount: float, num_stocks: int, risk: str) -> dict:
+    if num_stocks < 1:
+        num_stocks = 1
+
+    per_stock = round(amount / num_stocks, 2)
+
+    if risk == "HIGH":
+        invest_now = round(amount * 0.3, 2)
+        invest_ratio = 0.3
+        diversification_msg = "High risk — spread your investment across all stocks gradually."
+    elif risk == "MEDIUM":
+        invest_now = round(amount * 0.6, 2)
+        invest_ratio = 0.6
+        diversification_msg = "Good diversification — invest a portion now, rest over time."
+    else:
+        invest_now = amount
+        invest_ratio = 1.0
+        diversification_msg = "Low risk — diversification looks good, safe to invest now."
+
+    invest_later  = round(amount - invest_now, 2)
+    per_stock_now = round(invest_now / num_stocks, 2)
+    good_diversification = num_stocks >= 3
+
+    return {
+        "total_amount":        amount,
+        "num_stocks":          num_stocks,
+        "per_stock":           per_stock,
+        "invest_now":          invest_now,
+        "invest_later":        invest_later,
+        "per_stock_now":       per_stock_now,
+        "invest_ratio":        invest_ratio,
+        "diversification_msg": diversification_msg,
+        "good_diversification": good_diversification,
+    }
+
+
+def smart_recommendation(decision: dict, investment_amount: float = None, num_stocks: int = None) -> dict:
+    risk   = decision.get("risk", "MEDIUM")
+    action = decision.get("action", "HOLD")
+
+    result = {
+        "action":  action,
+        "risk":    risk,
+        "summary": decision.get("summary", ""),
+    }
+
+    if investment_amount and investment_amount > 0:
+        inv = investment_amount_advisor(investment_amount, risk)
+        result["investment_advice"] = inv
+
+        if num_stocks and num_stocks > 0:
+            alloc = allocation_advisor(investment_amount, num_stocks, risk)
+            result["allocation_advice"] = alloc
+
+            if action == "BUY":
+                mood = "bullish"
+            elif action == "SELL":
+                mood = "bearish"
+            else:
+                mood = "mixed/neutral"
+
+            risk_desc = {"HIGH": "high risk — be cautious", "MEDIUM": "moderate risk", "LOW": "low risk"}.get(risk, "moderate risk")
+            hold_back_str = f"Invest the remaining ₹{inv['hold_back_amount']:,.0f} gradually." if inv['hold_back_amount'] > 0 else "You can invest the full amount now."
+
+            result["final_explanation"] = (
+                f"Market is {mood} with {risk_desc}. "
+                f"You can invest ₹{inv['recommended_investment']:,.0f} now out of ₹{investment_amount:,.0f}. "
+                f"Allocate ~₹{alloc['per_stock_now']:,.0f} per stock across {num_stocks} stocks. "
+                f"{hold_back_str}"
+            )
+        else:
+            result["final_explanation"] = (
+                f"{'Market looks ' + ('positive — consider buying.' if action == 'BUY' else 'weak — consider holding off.' if action == 'SELL' else 'neutral — wait for a clearer signal.')} "
+                f"Recommended to invest ₹{inv['recommended_investment']:,.0f} now. {inv['investment_advice']}"
+            )
+
+    return result

@@ -3,7 +3,7 @@ import time
 import logging
 import warnings
 from data_engine import *
-from decision_making import *
+from decision_making import compute_decision, investment_amount_advisor, allocation_advisor, smart_recommendation
 from ai_agent_llm import *
 from opportunaty_radar import *
 from multi_scanner import *
@@ -267,7 +267,18 @@ def main() -> None:
             + "".join(f'<div style="font-size:.72rem;color:#7a8ba0;">{s}</div>' for s in pkg_status),
             unsafe_allow_html=True,
         )
-
+        st.markdown("---")
+        st.markdown("### 💰 Investment Advisor")
+        inv_amount = st.number_input(
+            "Investment Amount (₹)",
+            min_value=0, max_value=10_000_000, value=0, step=1000,
+            help="Enter the amount you're planning to invest. Leave at 0 to skip.",
+        )
+        num_stocks_inp = st.number_input(
+            "Number of Stocks to Split Across",
+            min_value=1, max_value=50, value=1, step=1,
+            help="How many different stocks you want to divide this money across.",
+        )
         st.markdown("---")
         run_btn = st.button("🚀  Run Alpha Radar", type="primary")
         st.markdown("""
@@ -343,7 +354,10 @@ def main() -> None:
     status.markdown('<div style="color:#7a8ba0;font-size:.82rem;">⏳ Computing decision…</div>', unsafe_allow_html=True)
 
     decision    = compute_decision(ta_signals, news_score)
-
+    # Investment Advisor (Features 1 & 2)
+    smart_rec = None
+    if inv_amount and inv_amount > 0:
+        smart_rec = smart_recommendation(decision, float(inv_amount), int(num_stocks_inp))
     progress.progress(70)
     status.markdown('<div style="color:#7a8ba0;font-size:.82rem;">⏳ Running AI agent…</div>', unsafe_allow_html=True)
 
@@ -417,9 +431,10 @@ def main() -> None:
     st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
     # ── TABS ──────────────────────────────────────────────────────────────────
-    tab1, tab2, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4 , tab5 = st.tabs([
         "📊 Analysis & Decision",
         "📰 Opportunity Radar",
+        "💰 Investment Advisor",
         "🕰️ Backtesting",
         "💼 Portfolio",
     ])
@@ -518,7 +533,155 @@ def main() -> None:
                 for kw, cnt in top_kws
             )
             st.markdown(f'<div style="line-height:2;">{kw_html}</div>', unsafe_allow_html=True)
+# ─────────── TAB 3: INVESTMENT ADVISOR ───────────────────────────────────
+    with tab3:
+        st.markdown('<div class="sh">💰 Investment Advisor — How Much Should I Invest?</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="font-size:.82rem;color:#7a8ba0;margin-bottom:16px;">'
+            'Enter your investment amount and number of stocks to get personalised guidance on '
+            '<b style="color:#f5c842;">how much to invest now</b> and <b style="color:#f5c842;">how to split it</b>.'
+            '</div>', unsafe_allow_html=True,
+        )
 
+        if not smart_rec:
+            st.markdown("""
+<div style="background:rgba(245,200,66,.07);border:1px solid rgba(245,200,66,.2);border-radius:12px;
+            padding:28px 24px;text-align:center;margin:20px 0;">
+  <div style="font-size:2rem;margin-bottom:10px;">💡</div>
+  <div style="font-weight:700;font-family:'Sora',sans-serif;font-size:1.05rem;margin-bottom:8px;">
+    Enter Your Investment Amount
+  </div>
+  <div style="font-size:.84rem;color:#7a8ba0;line-height:1.7;">
+    Set <b style="color:#f5c842;">Investment Amount (₹)</b> in the sidebar and re-run<br>
+    to get personalised invest-now guidance.
+  </div>
+</div>""", unsafe_allow_html=True)
+        else:
+            inv_advice   = smart_rec.get("investment_advice", {})
+            alloc_advice = smart_rec.get("allocation_advice", {})
+            final_exp    = smart_rec.get("final_explanation", "")
+            risk_col     = {"LOW": "#00e89a", "MEDIUM": "#f5c842", "HIGH": "#ff3f5b"}.get(decision["risk"], "#f5c842")
+            act_col      = {"BUY": "#00e89a", "SELL": "#ff3f5b", "HOLD": "#4fa3ff"}.get(decision["action"], "#4fa3ff")
+
+            if final_exp:
+                st.markdown(f"""
+<div style="background:rgba(0,232,154,.07);border:1px solid rgba(0,232,154,.2);
+            border-radius:12px;padding:20px 24px;margin-bottom:20px;">
+  <div style="font-size:.72rem;color:#7a8ba0;letter-spacing:1px;margin-bottom:6px;">🧠 SMART RECOMMENDATION</div>
+  <div style="font-size:1rem;color:#e2eafc;line-height:1.7;">{final_exp}</div>
+</div>""", unsafe_allow_html=True)
+
+            a1, a2, a3, a4 = st.columns(4)
+            with a1:
+                st.markdown(
+                    f'<div class="mc"><div class="mc-label">Decision</div>'
+                    f'<div class="mc-val" style="color:{act_col};">{decision["action"]}</div>'
+                    f'<div class="mc-sub">{decision["confidence"]}% confidence</div></div>',
+                    unsafe_allow_html=True,
+                )
+            with a2:
+                st.markdown(
+                    f'<div class="mc"><div class="mc-label">Risk Level</div>'
+                    f'<div class="mc-val" style="color:{risk_col};">{decision["risk"]}</div>'
+                    f'<div class="mc-sub">Affects invest ratio</div></div>',
+                    unsafe_allow_html=True,
+                )
+            with a3:
+                st.markdown(
+                    f'<div class="mc"><div class="mc-label">Invest Now</div>'
+                    f'<div class="mc-val" style="color:#00e89a;">₹{inv_advice.get("recommended_investment", 0):,.0f}</div>'
+                    f'<div class="mc-sub">of ₹{inv_advice.get("investment_amount", 0):,.0f} total</div></div>',
+                    unsafe_allow_html=True,
+                )
+            with a4:
+                hold_back = inv_advice.get("hold_back_amount", 0)
+                st.markdown(
+                    f'<div class="mc"><div class="mc-label">Keep in Reserve</div>'
+                    f'<div class="mc-val" style="color:#f5c842;">₹{hold_back:,.0f}</div>'
+                    f'<div class="mc-sub">Invest gradually later</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+            st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+            col_inv, col_alloc = st.columns([1, 1], gap="medium")
+
+            with col_inv:
+                st.markdown('<div class="sh">💵 Investment Amount Advisor</div>', unsafe_allow_html=True)
+                ratio_pct = int(inv_advice.get("invest_ratio", 0.6) * 100)
+                hold_back = inv_advice.get("hold_back_amount", 0)
+                st.markdown(f"""
+<div class="mc" style="padding:20px;">
+  <div style="font-size:.72rem;color:#7a8ba0;letter-spacing:1px;margin-bottom:14px;">STRATEGY</div>
+  <div style="font-weight:700;color:#f5c842;margin-bottom:10px;">{inv_advice.get("investment_strategy","")}</div>
+  <div style="font-size:.84rem;color:#7a8ba0;line-height:1.7;margin-bottom:16px;">{inv_advice.get("investment_advice","")}</div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+    <span style="font-size:.75rem;color:#7a8ba0;">Invest Now</span>
+    <span style="font-size:.75rem;color:#00e89a;font-weight:700;">{ratio_pct}%</span>
+  </div>
+  <div style="background:rgba(255,255,255,.06);border-radius:6px;height:8px;margin-bottom:14px;">
+    <div style="background:#00e89a;border-radius:6px;height:8px;width:{ratio_pct}%;"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+    <div style="background:rgba(0,232,154,.08);border:1px solid rgba(0,232,154,.2);border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-size:.65rem;color:#7a8ba0;">Invest Now</div>
+      <div style="font-size:1.1rem;font-weight:700;color:#00e89a;">₹{inv_advice.get("recommended_investment",0):,.0f}</div>
+    </div>
+    <div style="background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.2);border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-size:.65rem;color:#7a8ba0;">Hold Back</div>
+      <div style="font-size:1.1rem;font-weight:700;color:#f5c842;">₹{hold_back:,.0f}</div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
+
+            with col_alloc:
+                st.markdown('<div class="sh">📊 Multi-Stock Allocation Advisor</div>', unsafe_allow_html=True)
+                if alloc_advice:
+                    n = alloc_advice.get("num_stocks", 1)
+                    good_div = alloc_advice.get("good_diversification", False)
+                    div_icon = "✅" if good_div else "⚠️"
+                    div_msg  = "Diversification looks good!" if good_div else "Consider adding more stocks for better diversification."
+                    st.markdown(f"""
+<div class="mc" style="padding:20px;">
+  <div style="font-size:.72rem;color:#7a8ba0;letter-spacing:1px;margin-bottom:14px;">ALLOCATION BREAKDOWN</div>
+  <div style="font-size:.84rem;color:#7a8ba0;line-height:1.7;margin-bottom:14px;">{alloc_advice.get("diversification_msg","")}</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+    <div style="background:rgba(79,163,255,.08);border:1px solid rgba(79,163,255,.2);border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-size:.65rem;color:#7a8ba0;">Per Stock (Total)</div>
+      <div style="font-size:1rem;font-weight:700;color:#4fa3ff;">₹{alloc_advice.get("per_stock",0):,.0f}</div>
+    </div>
+    <div style="background:rgba(0,232,154,.08);border:1px solid rgba(0,232,154,.2);border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-size:.65rem;color:#7a8ba0;">Per Stock (Invest Now)</div>
+      <div style="font-size:1rem;font-weight:700;color:#00e89a;">₹{alloc_advice.get("per_stock_now",0):,.0f}</div>
+    </div>
+    <div style="background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.2);border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-size:.65rem;color:#7a8ba0;">Invest Now (Total)</div>
+      <div style="font-size:1rem;font-weight:700;color:#f5c842;">₹{alloc_advice.get("invest_now",0):,.0f}</div>
+    </div>
+    <div style="background:rgba(255,63,91,.08);border:1px solid rgba(255,63,91,.2);border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-size:.65rem;color:#7a8ba0;">Invest Later</div>
+      <div style="font-size:1rem;font-weight:700;color:#ff3f5b;">₹{alloc_advice.get("invest_later",0):,.0f}</div>
+    </div>
+  </div>
+  <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px 14px;font-size:.82rem;color:#e2eafc;">
+    {div_icon} Across <b style="color:#f5c842;">{n} stock{"s" if n!=1 else ""}</b> &nbsp;·&nbsp; {div_msg}
+  </div>
+</div>""", unsafe_allow_html=True)
+                else:
+                    st.markdown("""
+<div class="mc" style="padding:20px;text-align:center;">
+  <div style="font-size:1.5rem;margin-bottom:10px;">📊</div>
+  <div style="font-size:.84rem;color:#7a8ba0;">
+    Set <b style="color:#f5c842;">Number of Stocks</b> in the sidebar to see allocation breakdown.
+  </div>
+</div>""", unsafe_allow_html=True)
+
+            st.markdown("""
+<div style="margin-top:16px;background:rgba(255,63,91,.05);border:1px solid rgba(255,63,91,.15);
+            border-radius:8px;padding:12px 16px;font-size:.76rem;color:#7a8ba0;line-height:1.7;">
+  ⚠️ <b style="color:#ff3f5b;">Important:</b> Investment amount guidance is based on technical risk level only.
+  The BUY/SELL/HOLD decision is <b>not affected</b> by your investment amount.
+  This is for <b>educational purposes only</b> — not SEBI-registered financial advice.
+</div>""", unsafe_allow_html=True)
     # ─────────── TAB 4: BACKTESTING ──────────────────────────────────────────
     with tab4:
         st.markdown('<div class="sh">🕰️ Backtesting — How Has This Signal Performed?</div>', unsafe_allow_html=True)
